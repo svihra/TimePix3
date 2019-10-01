@@ -358,7 +358,7 @@ Int_t DataProcess::openCorr(Bool_t create)
         loadCorrection();
     }
 
-    if (m_fileCorr == NULL)
+    if (m_fileCorr == nullptr)
     {
         std::cout << " ========================================== " << std::endl;
         std::cout << " == COULD NOT OPEN CORR, PLEASE CHECK IT == " << std::endl;
@@ -374,7 +374,7 @@ Int_t DataProcess::openDat(ULong64_t fileCounter)
     FILE* fileDat = fopen(m_fileNamePath + m_fileNameDat[fileCounter], "r");
     std::cout << m_fileNameDat[fileCounter] << " at " << m_fileNamePath << std::endl;
 
-    if (fileDat == NULL)
+    if (fileDat == nullptr)
     {
         std::cout << " ========================================== " << std::endl;
         std::cout << " == COULD NOT OPEN DAT, PLEASE CHECK IT === " << std::endl;
@@ -408,7 +408,7 @@ Int_t DataProcess::openCsv(DataType type, TString fileCounter)
     FILE* fileCsv = fopen(m_fileNamePath + fileNameTmp, "w");
     std::cout << fileNameTmp << " at " << m_fileNamePath << std::endl;
 
-    if (fileCsv == NULL)
+    if (fileCsv == nullptr)
     {
         std::cout << " ========================================== " << std::endl;
         std::cout << " = COULD NOT OPEN CSV, "<< fileCounter << " PLEASE CHECK IT == " << std::endl;
@@ -433,10 +433,12 @@ Int_t DataProcess::openCsv(DataType type, TString fileCounter)
     if (m_bRow)     fprintf(files->back(), "#Row,");
     if (m_bToA)     fprintf(files->back(), "#ToA,");
     if (m_bToT)     fprintf(files->back(), "#ToT[arb],");
+    if (m_bToT)     fprintf(files->back(), "#ToTtotal[arb],");
     if (m_bTrigToA) fprintf(files->back(), "#Trig-ToA[arb],");
     if (type == dtCent)
         if (m_bCentroid)fprintf(files->back(), "#Centroid,");
     if (m_correction != corrOff && m_bTrigToA) fprintf(files->back(), "#cTrig-ToA[us],");
+
 
     fprintf(files->back(), "\n");
 
@@ -447,7 +449,7 @@ Int_t DataProcess::openRoot(ULong64_t fileCounter)
 {
     //
     // Open file
-    TFile * fileRoot = NULL;
+    TFile * fileRoot = nullptr;
 
     TString fileNameTmp = m_fileName;
     m_fileNameRoot.push_back(fileNameTmp.Replace(fileNameTmp.Last('.'),200, "_c" + TString::Format("%lld", fileCounter) + ".root"));
@@ -459,7 +461,7 @@ Int_t DataProcess::openRoot(ULong64_t fileCounter)
 
         //
         // check if file opened correctly
-        if (fileRoot == NULL)
+        if (fileRoot == nullptr)
         {
             std::cout << " ========================================== " << std::endl;
             std::cout << " == COULD NOT OPEN ROOT, PLEASE CHECK IT == " << std::endl;
@@ -469,11 +471,12 @@ Int_t DataProcess::openRoot(ULong64_t fileCounter)
 
         //
         // create trees
-        m_rawTree.push_back(new TTree("rawtree", "raw data, Version 0.1.0"));
+        m_rawTree.push_back(new TTree("rawtree", "raw data, Version 0.2.0"));
         m_rawTree.back()->Branch("Size", &m_Size, "Size/i");
         m_rawTree.back()->Branch("Col",   m_Cols, "Col[Size]/i");
         m_rawTree.back()->Branch("Row",   m_Rows, "Row[Size]/i");
         m_rawTree.back()->Branch("ToT",   m_ToTs, "ToT[Size]/i");
+        m_rawTree.back()->Branch("ToTt", &m_ToTt, "ToTt/l");    // l for long
         m_rawTree.back()->Branch("ToA",   m_ToAs, "ToA[Size]/l");    // l for long
 
         m_timeTree.push_back(new TTree("timetree", "TDC counts"));
@@ -521,7 +524,7 @@ Int_t DataProcess::openRoot(ULong64_t fileCounter)
 
         //
         // check if file opened correctly
-        if (fileRoot == NULL)
+        if (fileRoot == nullptr)
         {
             std::cout << " ========================================== " << std::endl;
             std::cout << " == COULD NOT OPEN ROOT, PLEASE CHECK IT == " << std::endl;
@@ -532,10 +535,20 @@ Int_t DataProcess::openRoot(ULong64_t fileCounter)
         //
         // read trees
         m_rawTree.push_back(reinterpret_cast<TTree*>(fileRoot->Get("rawtree")));
-        m_rawTree.back()->SetBranchAddress("Size", &m_Size);
+        m_rawTree.back()->SetBranchAddress("Size",&m_Size);
         m_rawTree.back()->SetBranchAddress("Col",  m_Cols);
         m_rawTree.back()->SetBranchAddress("Row",  m_Rows);
         m_rawTree.back()->SetBranchAddress("ToT",  m_ToTs);
+        try
+        {
+            m_rawTree.back()->SetBranchAddress("ToTt", &m_ToTt);
+        }
+        catch (const char* msg)
+        {
+            std::cout << "Old version of file, does not contain calculated cluster ToT" << std::endl;
+            std::cout << msg << std::endl;
+        }
+
         m_rawTree.back()->SetBranchAddress("ToA",  m_ToAs);
 
         m_timeTree.push_back(reinterpret_cast<TTree*>(fileRoot->Get("timetree")));
@@ -567,7 +580,7 @@ Int_t DataProcess::openRoot(ULong64_t fileCounter)
         }
     }
 
-    if (fileRoot != NULL)
+    if (fileRoot != nullptr)
     {
         m_filesRoot.push_back(fileRoot);
         m_filesRoot.back()->cd();
@@ -591,6 +604,17 @@ void DataProcess::openChain()
     m_rawChain->SetBranchAddress("Row",  m_Rows);
     m_rawChain->SetBranchAddress("ToT",  m_ToTs);
     m_rawChain->SetBranchAddress("ToA",  m_ToAs);
+
+    try
+    {
+        m_rawChain->SetBranchAddress("ToTt", &m_ToTt);
+    }
+    catch (const char* msg)
+    {
+        std::cout << "Old version of file, does not contain calculated cluster ToT" << std::endl;
+        std::cout << msg << std::endl;
+    }
+
 
     m_timeChain = new TChain("timetree");
     m_timeChain->SetBranchAddress("TrigCntr", &m_trigCnt);
@@ -626,7 +650,6 @@ void DataProcess::closeCorr()
 void DataProcess::closeDat()
 {
     while (m_filesDat.size() != 0)
-//    for (UInt_t size = 0; size < m_filesDat.size(); size++)
     {
         fclose(m_filesDat.front());
         m_filesDat.pop_front();
@@ -1045,6 +1068,7 @@ Int_t DataProcess::processDat()
                 //
                 // save data - centroid will have index 0, others following - not necessarilly time-sorted
                 ToT = 0;
+                m_ToTt = 0;
                 centeredIndex = 0;
                 m_Size = static_cast<UInt_t>(centeredIndices.size());
 
@@ -1067,6 +1091,7 @@ Int_t DataProcess::processDat()
                     m_Rows[k] = Rows[centeredIndices.front()];
                     m_ToTs[k] = ToTs[centeredIndices.front()];
                     m_ToAs[k] = ToAs[centeredIndices.front()];
+                    m_ToTt   += ToTs[centeredIndices.front()];
 
                     if (k != 0 && centeredIndex == centeredIndices.front())
                     {
@@ -1119,6 +1144,7 @@ Int_t DataProcess::processDat()
                     m_Rows[k] = 0;
                     m_ToTs[k] = 0;
                     m_ToAs[k] = 0;
+                    m_ToTt    = 0;
                 }
 
                 // dump raw data
@@ -1356,6 +1382,7 @@ Int_t DataProcess::processRoot()
                         if (m_bRow)     fprintf(m_filesCentCsv.back(), "%u,",  m_Rows[0]);
                         if (m_bToA)     fprintf(m_filesCentCsv.back(), "%llu,",m_ToAs[0]);
                         if (m_bToT)     fprintf(m_filesCentCsv.back(), "%u,",  m_ToTs[0]);
+                        if (m_bToT)     fprintf(m_filesCentCsv.back(), "%llu,",m_ToTt);
                         if (m_bTrigToA) fprintf(m_filesCentCsv.back(), "%llu,",m_ToAs[0] - m_trigTime);
                         if (m_bCentroid)fprintf(m_filesCentCsv.back(), "%u,",  m_Size);
                     }
@@ -1416,6 +1443,7 @@ Int_t DataProcess::processRoot()
                         if (m_bRow)     fprintf(m_filesCsv.back(), "%u,",  m_Rows[entryRaw]);
                         if (m_bToA)     fprintf(m_filesCsv.back(), "%llu,",m_ToAs[entryRaw]);
                         if (m_bToT)     fprintf(m_filesCsv.back(), "%u,",  m_ToTs[entryRaw]);
+                        if (m_bToT)     fprintf(m_filesCsv.back(), "%llu,",m_ToTt);
                         if (m_bTrigToA) fprintf(m_filesCsv.back(), "%llu,",m_ToAs[entryRaw] - m_trigTime);
                     }
 
@@ -1640,6 +1668,7 @@ void DataProcess::appendProcTree(ULong64_t ToATrig[MAXHITS], Double_t ToF[MAXHIT
         m_procTree.back()->Branch("Col",   m_Cols, "Col[Size]/i");
         m_procTree.back()->Branch("Row",   m_Rows, "Row[Size]/i");
         m_procTree.back()->Branch("ToT",   m_ToTs, "ToT[Size]/i");
+        m_procTree.back()->Branch("ToTt", &m_ToTt, "ToTt/l");    // l for long unsigned
         m_procTree.back()->Branch("ToA",   m_ToAs, "ToA[Size]/l");    // l for long unsigned
         m_procTree.back()->Branch("ToATrig",  ToATrig, "ToATrig[Size]/l");    // l for long unsigned
         m_procTree.back()->Branch("ToF",      ToF, "ToF[Size]/F");    // F for float

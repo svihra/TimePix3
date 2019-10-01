@@ -234,6 +234,7 @@ private:
     UInt_t      m_Cols[MAXHITS];
     UInt_t      m_Size;
     UInt_t      m_ToTs[MAXHITS];
+    ULong64_t   m_ToTt;
     ULong64_t   m_ToAs[MAXHITS];
 
     //
