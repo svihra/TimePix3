@@ -12,6 +12,7 @@
 #include <TApplication.h>
 #include <TSysEvtHandler.h>
 
+#include "TGFileDialog.h"
 #include "TGTextEdit.h"
 #include "TGText.h"
 #include "TGDimension.h"
@@ -20,6 +21,7 @@
 #include <deque>
 #include "dataprocess.h"
 
+#include <iostream>
 
 const char * fileTypes[] = {
         "data files", "*.dat",
@@ -591,23 +593,23 @@ void DRGui::ProcessNames()
 
         if (fileName.EndsWith(".root") || fileName.EndsWith(".dat") || fileName.EndsWith(".tpx3"))
         {
-            cout << fileName << " " << inputNumber << endl;
+            std::cout << fileName << " " << inputNumber << std::endl;
             m_inputNames[inputNumber++].SetString(fileName);
         }
         else
         {
-            cout << " ========================================== " << endl;
-            cout << " ======== INVALID ENTRY FILE NAME ========= " << endl;
-            cout << fileName << endl;
-            cout << " ========================================== " << endl;
+            std::cout << " ========================================== " << std::endl;
+            std::cout << " ======== INVALID ENTRY FILE NAME ========= " << std::endl;
+            std::cout << fileName << endl;
+            std::cout << " ========================================== " << std::endl;
         }
     }
 }
 
 void DRGui::StopReducer()
 {
-    cout << "==============================================="  << endl;
-    cout << "======== REDUCER SUCCESSFULLY STOPPED ========="  << endl;
-    cout << "==============================================="  << endl;
+    std::cout << "==============================================="  << std::endl;
+    std::cout << "======== REDUCER SUCCESSFULLY STOPPED ========="  << std::endl;
+    std::cout << "==============================================="  << std::endl;
     gSystem->ExitLoop();
 }

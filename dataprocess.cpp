@@ -39,6 +39,9 @@ void DataProcess::Init()
     m_sigHandler->Add();
     m_sigHandler->Connect("Notified()", "DataProcess", this, "StopLoop()");
 
+    m_nCent = 0;
+    m_nTime = 0;
+
     m_numInputs = 1;
     m_trigCnt = 0;
     m_maxEntries = 0;
@@ -81,7 +84,7 @@ void DataProcess::setCorrection(CorrType correction, TString fileNameCorrection)
             if (fileNameCorrection.Sizeof() > 1 )
             {
                 closeCorr();
-                std::cout << " - with file" << m_correctionName << std::endl;
+                std::cout << " - with file " << m_correctionName << std::endl;
                 openCorr(kTRUE);
                 m_bCorrCsv = kTRUE;
             }
@@ -358,7 +361,7 @@ Int_t DataProcess::openCorr(Bool_t create)
     if (m_fileCorr == NULL)
     {
         std::cout << " ========================================== " << std::endl;
-        std::cout << " == COULD NOT OPEN DAT, PLEASE CHECK IT === " << std::endl;
+        std::cout << " == COULD NOT OPEN CORR, PLEASE CHECK IT == " << std::endl;
         std::cout << " ========================================== " << std::endl;
         return -1;
     }
@@ -609,7 +612,10 @@ void DataProcess::openChain()
 void DataProcess::closeCorr()
 {
     if (m_bCorrCsv)
+    {
         fclose(m_fileCorr);
+        m_bCorrCsv = kFALSE;
+    }
 
     while (m_lookupTable.size() != 0)
     {
@@ -944,8 +950,8 @@ Int_t DataProcess::processDat()
         }
         else if (++curInput < m_numInputs)
         {
-            m_nCent = m_rawTree.back()->GetEntries();
-            m_nTime = m_timeTree.back()->GetEntries();
+            m_nCent += m_rawTree.back()->GetEntries();
+            m_nTime += m_timeTree.back()->GetEntries();
             finishMsg(m_fileNameDat[curInput-1], "processing data", m_pixelCounter, curInput);
             openDat(curInput);
             if (m_type == dtDat)

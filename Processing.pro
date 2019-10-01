@@ -14,7 +14,8 @@ LIBS        += $$system(${ROOTSYS}/bin/root-config --glibs)
 TARGET = ../Scripts/processing
 
 SOURCES += main.cpp \
-    dataprocess.cpp
+    dataprocess.cpp \
+    DRGUI.C
 #    mainwindow.cpp
 
 HEADERS += \
