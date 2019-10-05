@@ -573,6 +573,7 @@ void DRGui::RunReducer()
     std::cout << "Total Runtime of the code: " << std::endl;
     time.Print();
 
+    delete processor;
 }
 
 void DRGui::ProcessNames()

@@ -39,11 +39,7 @@ void DataProcess::Init()
     m_sigHandler->Add();
     m_sigHandler->Connect("Notified()", "DataProcess", this, "StopLoop()");
 
-    m_nCent = 0;
-    m_nTime = 0;
-
     m_numInputs = 1;
-    m_trigCnt = 0;
     m_maxEntries = 0;
     m_bFirstTrig = kFALSE;
     m_bDevID = kFALSE;
@@ -169,6 +165,14 @@ Int_t DataProcess::process()
 {
     m_time.Start();
     m_pixelCounter = 0;
+    m_nCent = 0;
+    m_nCents.push_back(m_nCent);
+    m_nTime = 0;
+    m_nTimes.push_back(m_nTime);
+    m_trigCnt = 0;
+
+    m_bFirstTrig = kFALSE;
+    m_bDevID = kFALSE;
 
     //
     // create filenames
@@ -549,11 +553,15 @@ Int_t DataProcess::openRoot(ULong64_t fileCounter)
             std::cout << msg << std::endl;
         }
 
+        m_nCents.push_back(m_rawTree.back()->GetEntries());
+
+
         m_rawTree.back()->SetBranchAddress("ToA",  m_ToAs);
 
         m_timeTree.push_back(reinterpret_cast<TTree*>(fileRoot->Get("timetree")));
         m_timeTree.back()->SetBranchAddress("TrigCntr", &m_trigCnt);
         m_timeTree.back()->SetBranchAddress("TrigTime", &m_trigTime);
+        m_nTimes.push_back(m_rawTree.back()->GetEntries());
 
         if (m_filesRoot.size() == 0)
         {
@@ -589,47 +597,6 @@ Int_t DataProcess::openRoot(ULong64_t fileCounter)
     else
     {
         return -1;
-    }
-}
-
-void DataProcess::openChain()
-{
-    std::cout << " ========================================== " << std::endl;
-    std::cout << " ============ SETTING UP CHAIN ============ " << std::endl;
-    std::cout << " ========================================== " << std::endl;
-
-    m_rawChain  = new TChain("rawtree" );
-    m_rawChain->SetBranchAddress("Size", &m_Size);
-    m_rawChain->SetBranchAddress("Col",  m_Cols);
-    m_rawChain->SetBranchAddress("Row",  m_Rows);
-    m_rawChain->SetBranchAddress("ToT",  m_ToTs);
-    m_rawChain->SetBranchAddress("ToA",  m_ToAs);
-
-    try
-    {
-        m_rawChain->SetBranchAddress("ToTt", &m_ToTt);
-    }
-    catch (const char* msg)
-    {
-        std::cout << "Old version of file, does not contain calculated cluster ToT" << std::endl;
-        std::cout << msg << std::endl;
-    }
-
-
-    m_timeChain = new TChain("timetree");
-    m_timeChain->SetBranchAddress("TrigCntr", &m_trigCnt);
-    m_timeChain->SetBranchAddress("TrigTime", &m_trigTime);
-
-    for (ULong64_t nameCnt = 0; nameCnt < m_fileNameRoot.size(); nameCnt++)
-    {
-        std::cout << "Add: " << m_fileNamePath + m_fileNameRoot[nameCnt] << std::endl;
-
-        m_filesRoot[nameCnt]->cd();
-        m_rawTree[nameCnt]->Write();
-        m_timeTree[nameCnt]->Write();
-
-        m_rawChain ->Add(m_fileNamePath + m_fileNameRoot[nameCnt]);
-        m_timeChain->Add(m_fileNamePath + m_fileNameRoot[nameCnt]);
     }
 }
 
@@ -684,8 +651,26 @@ void DataProcess::closeRoot()
         m_filesRoot.front()->Write();
         m_filesRoot.front()->Close();
 
+        m_rawTree.pop_front();
+        m_timeTree.pop_front();
+        if (m_bProcTree)
+        {
+            m_procTree.pop_front();
+        }
         m_filesRoot.pop_front();
     }
+
+    while (m_nCents.size() != 0)
+    {
+        m_nCents.pop_front();
+    }
+
+    while (m_nTimes.size() != 0)
+    {
+        m_nTimes.pop_front();
+    }
+
+    std::cout << "All zeros: " << m_nCents.size() << m_nTimes.size() << m_filesRoot.size() << std::endl;
 }
 
 Int_t DataProcess::skipHeader()
@@ -824,9 +809,6 @@ Int_t DataProcess::processDat()
     ULong64_t treeEntry = 0;
     ULong64_t chainCounter = 0;
 
-    m_nCents.push_back(0);
-    m_nTimes.push_back(0);
-
     //
     // skip main header and obtain device ID
     if (m_type == dtDat)
@@ -845,7 +827,6 @@ Int_t DataProcess::processDat()
         //
         // read entries, write out each 10^5
         retVal = fread( &pixdata, sizeof(ULong64_t), 1, m_filesDat.back());
-        if (m_pixelCounter % 100000 == 0) std::cout << "File "<< curInput << "/" << m_numInputs <<" Count " << m_pixelCounter << std::endl;
 
         //
         // reading data and saving them to deques or timeTrees
@@ -858,6 +839,7 @@ Int_t DataProcess::processDat()
             // finding header type (data part - frames/data driven)
             if (header == 0xA || header == 0xB)
             {
+                if (m_pixelCounter % 100000 == 0) std::cout << "File "<< curInput << "/" << m_numInputs <<" Count " << m_pixelCounter << std::endl;
                 treeEntry++;
                 m_pixelCounter++;
 
@@ -1227,10 +1209,6 @@ Int_t DataProcess::processRoot()
 
     ULong64_t rawChainCounter  = 0;
     ULong64_t timeChainCounter = 0;
-
-//    openChain();
-//    m_nCent = m_rawChain ->GetEntries();
-//    m_nTime = m_timeChain->GetEntries();
 
     m_nCent = m_nCents[m_filesRoot.size()];
     m_nTime = m_nTimes[m_filesRoot.size()];

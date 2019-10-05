@@ -13,8 +13,6 @@
 #include "TH1.h"
 #include "TH2.h"
 
-#include "TChain.h"
-
 #define MAXHITS 65536       // minimal value for sorting 65536
 
 using namespace std;
@@ -89,7 +87,6 @@ private:
     Int_t openDat(ULong64_t fileCounter = 0);
     Int_t openCsv(DataType type = dtStandard, TString fileCounter = "");
     Int_t openRoot(ULong64_t fileCounter = 0);
-    void  openChain();
 
     void  findCluster(ULong64_t index, ULong64_t stop, deque<UInt_t >* cols, deque<UInt_t >* rows, deque<ULong64_t >* toas, deque<UInt_t> *tots, deque<Bool_t >* centered, deque<ULong64_t> *indices);
     Int_t processDat();
@@ -168,16 +165,11 @@ private:
     FILE*           m_fileCorr;
     deque<FILE* >   m_filesDat;
     deque<TFile* >  m_filesRoot;
-//    TFile*          m_fileRoot;
     deque<FILE* >   m_filesCsv;
     deque<FILE* >   m_filesCentCsv;
 
     //
     // ROOT trees
-    TChain* m_rawChain;
-    TChain* m_timeChain;
-    TChain* m_procChain;
-
     deque<TTree* > m_rawTree;
     deque<TTree* > m_timeTree;
     deque<TTree* > m_procTree;
