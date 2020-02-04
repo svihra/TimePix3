@@ -1213,6 +1213,11 @@ Int_t DataProcess::processRoot()
     m_nCent = m_nCents[m_filesRoot.size()];
     m_nTime = m_nTimes[m_filesRoot.size()];
 
+
+    std::cout << "Num times: " << m_nTimes.size() << std::endl;
+    std::cout << "Cent entries: " << m_nCent << std::endl;
+    std::cout << "Time entries: " << m_nTime << std::endl;
+
     if (m_bProcTree)
     {
         // create all proc trees
@@ -1261,14 +1266,21 @@ Int_t DataProcess::processRoot()
 
         if (m_nTime != 0)
         {
-            if (m_bNoTrigWindow && ((entryTime + 1) < m_nTime))
+            if (m_bNoTrigWindow )
             {
-                if ((entryTime + 1) >= m_nTimes[timeChainCounter + 1])
-                    m_timeTree[timeChainCounter+1]->GetEntry(entryTime + 1 - m_nTimes[timeChainCounter+1]);
-                else
-                    m_timeTree[timeChainCounter  ]->GetEntry(entryTime + 1 - m_nTimes[timeChainCounter]);
+                if ((entryTime + 1) < m_nTime)
+                {
+                    if ((entryTime + 1) >= m_nTimes[timeChainCounter + 1])
+                        m_timeTree[timeChainCounter+1]->GetEntry(entryTime + 1 - m_nTimes[timeChainCounter+1]);
+                    else
+                        m_timeTree[timeChainCounter  ]->GetEntry(entryTime + 1 - m_nTimes[timeChainCounter]);
 
-                m_trigTimeNext = m_trigTime;
+                    m_trigTimeNext = m_trigTime;
+                }
+                else
+                {
+                    m_trigTimeNext = ~static_cast<ULong64_t>(0);
+                }
                 m_timeTree[timeChainCounter]->GetEntry(entryTime - m_nTimes[timeChainCounter]);
                 lfTimeWindow = m_trigTimeNext - m_trigTime;
                 lfTimeStart = 0;
@@ -1285,7 +1297,7 @@ Int_t DataProcess::processRoot()
                 }
                 else
                     m_trigTimeNext = 0;
-
+                std::cout<< entryTime << " and " << m_nTimes[timeChainCounter] << std::endl;
                 m_timeTree[timeChainCounter]->GetEntry(entryTime - m_nTimes[timeChainCounter]);
             }
 
@@ -1295,6 +1307,7 @@ Int_t DataProcess::processRoot()
                 // single file creation
                 if (m_filesCsv.size() == 0)
                 {
+                    std::cout << "opening time csv file" << std::endl;
                     if (openCsv()) return -1;
                 }
                 //
@@ -1343,6 +1356,7 @@ Int_t DataProcess::processRoot()
                         // single file creation
                         if (m_bSingleFile && m_filesCentCsv.size() == 0)
                         {
+                            std::cout<< "opening cent csv file" << std::endl;
                             if (openCsv(dtCent)) return -1;
                         }
 
@@ -1405,6 +1419,7 @@ Int_t DataProcess::processRoot()
                     // multiple file creation
                     if (m_bSingleFile && m_filesCsv.size() == 0)
                     {
+                        std::cout << "opening all csv file" << std::endl;
                         if (openCsv(dtStandard)) return -1;
                     }
                 }
