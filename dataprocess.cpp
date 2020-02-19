@@ -440,7 +440,11 @@ Int_t DataProcess::openCsv(DataType type, TString fileCounter)
     if (m_bToT)     fprintf(files->back(), "#ToTtotal[arb],");
     if (m_bTrigToA) fprintf(files->back(), "#Trig-ToA[arb],");
     if (type == dtCent)
+    {
         if (m_bCentroid)fprintf(files->back(), "#Centroid,");
+        if (m_bCentroid)fprintf(files->back(), "#cent_X,");
+        if (m_bCentroid)fprintf(files->back(), "#cent_Y,");
+    }
     if (m_correction != corrOff && m_bTrigToA) fprintf(files->back(), "#cTrig-ToA[us],");
 
 
@@ -476,12 +480,14 @@ Int_t DataProcess::openRoot(ULong64_t fileCounter)
         //
         // create trees
         m_rawTree.push_back(new TTree("rawtree", "raw data, Version 0.2.0"));
-        m_rawTree.back()->Branch("Size", &m_Size, "Size/i");
-        m_rawTree.back()->Branch("Col",   m_Cols, "Col[Size]/i");
-        m_rawTree.back()->Branch("Row",   m_Rows, "Row[Size]/i");
-        m_rawTree.back()->Branch("ToT",   m_ToTs, "ToT[Size]/i");
-        m_rawTree.back()->Branch("ToTt", &m_ToTt, "ToTt/l");    // l for long
-        m_rawTree.back()->Branch("ToA",   m_ToAs, "ToA[Size]/l");    // l for long
+        m_rawTree.back()->Branch("Size"   , &m_Size, "Size/i");
+        m_rawTree.back()->Branch("Col"    ,  m_Cols, "Col[Size]/i");
+        m_rawTree.back()->Branch("ColCent", &m_posX, "ColCent/D");
+        m_rawTree.back()->Branch("Row"    ,  m_Rows, "Row[Size]/i");
+        m_rawTree.back()->Branch("RowCent", &m_posY, "RowCent/D");
+        m_rawTree.back()->Branch("ToT"    ,   m_ToTs, "ToT[Size]/i");
+        m_rawTree.back()->Branch("ToTt"   , &m_ToTt, "ToTt/l");    // l for long
+        m_rawTree.back()->Branch("ToA"    ,   m_ToAs, "ToA[Size]/l");    // l for long
 
         m_timeTree.push_back(new TTree("timetree", "TDC counts"));
         m_timeTree.back()->Branch("TrigCntr", &m_trigCnt, "TrigCntr/i");
@@ -800,7 +806,6 @@ Int_t DataProcess::processDat()
 
     ULong64_t tmpToA;
     Float_t   tmpToT;
-    UInt_t    posX, posY;
     Bool_t    indexFound;
 
     UInt_t backjumpcnt = 0;
@@ -871,7 +876,7 @@ Int_t DataProcess::processDat()
                 diff = longtimebits - pixelbits;
                 if( diff == 1  || diff == -3)  globaltime = ( (longtime - 0x10000000) & 0xFFFFC0000000) | (ToA_coarse & 0x3FFFFFFF);
                 if( diff == -1 || diff == 3 )  globaltime = ( (longtime + 0x10000000) & 0xFFFFC0000000) | (ToA_coarse & 0x3FFFFFFF);
-                if ( ( ( globaltime >> 28 ) & 0x3 ) != ( (ULong64_t) pixelbits ) )
+                if ( ( ( globaltime >> 28 ) & 0x3 ) != ( static_cast<ULong64_t>(pixelbits) ) )
                 {
                     std::cout << "Error, checking bits should match .. " << std::endl;
                     std::cout << hex << globaltime << " " << ToA_coarse << " " << dec << ( ( globaltime >> 28 ) & 0x3 ) << " " << pixelbits << " " << diff << std::endl;
@@ -924,7 +929,7 @@ Int_t DataProcess::processDat()
                             else std::cout << "small backward time jump in trigger packet " << m_trigCnt << " (jump of " << prev_trigtime_coarse-trigtime_coarse << ")" << std::endl;
                         }
                         m_bFirstTrig = kTRUE;
-                        m_trigTime = ((trigtime_global_ext + (ULong64_t) trigtime_coarse) << 12) | (ULong64_t) trigtime_fine; // save in ns
+                        m_trigTime = ((trigtime_global_ext + static_cast<ULong64_t>(trigtime_coarse)) << 12) | static_cast<ULong64_t>(trigtime_fine); // save in ns
 
                         //
                         // fill timeTree and trigger histogram
@@ -997,8 +1002,8 @@ Int_t DataProcess::processDat()
             for (ULong64_t i = 0; i < actSortedSize ; i++)
             {
                 indexFound  = kFALSE;
-                posX        = Cols.front();
-                posY        = Rows.front();
+                m_posX        = static_cast<Double_t>(Cols.front());
+                m_posY        = static_cast<Double_t>(Rows.front());
                 ToT         = ToTs.front();
 
                 if (m_bCentroid)
@@ -1027,19 +1032,19 @@ Int_t DataProcess::processDat()
 
                     // get centroid
                     ToT       = 0;
-                    posX      = 0;
-                    posY      = 0;
+                    m_posX      = 0;
+                    m_posY      = 0;
                     for (ULong64_t k = 0; k < centeredIndices.size(); k++)
                     {
                         ToT      += ToTs[centeredIndices[k]];
-                        posX     += ToTs[centeredIndices[k]]*Cols[centeredIndices[k]];
-                        posY     += ToTs[centeredIndices[k]]*Rows[centeredIndices[k]];
+                        m_posX     += ToTs[centeredIndices[k]]*Cols[centeredIndices[k]];
+                        m_posY     += ToTs[centeredIndices[k]]*Rows[centeredIndices[k]];
                     }
 
                     if (centeredIndices.size() > 0 )
                     {
-                        posX = (UInt_t) ((((Float_t) posX) / ToT) + 0.5);
-                        posY = (UInt_t) ((((Float_t) posY) / ToT) + 0.5);
+                        m_posX = (m_posX / ToT) + 0.5;
+                        m_posY = (m_posY / ToT) + 0.5;
                     }
                 }
                 else
@@ -1056,7 +1061,7 @@ Int_t DataProcess::processDat()
 
                 for (UInt_t k = 0; k < m_Size; k++)
                 {
-                    if (!indexFound && Cols[centeredIndices.front()] == posX && Rows[centeredIndices.front()] == posY)
+                    if (!indexFound && Cols[centeredIndices.front()] == static_cast<UInt_t>(m_posX) && Rows[centeredIndices.front()] == static_cast<UInt_t>(m_posY))
                     {
                         centeredIndex = centeredIndices.front();
                         indexFound = kTRUE;
@@ -1377,6 +1382,8 @@ Int_t DataProcess::processRoot()
                         if (m_bToT)     fprintf(m_filesCentCsv.back(), "%llu,",m_ToTt);
                         if (m_bTrigToA) fprintf(m_filesCentCsv.back(), "%llu,",m_ToAs[0] - m_trigTime);
                         if (m_bCentroid)fprintf(m_filesCentCsv.back(), "%u,",  m_Size);
+                        if (m_bCentroid)fprintf(m_filesCentCsv.back(), "%lf,", m_posX);
+                        if (m_bCentroid)fprintf(m_filesCentCsv.back(), "%lf,", m_posY);
                     }
 
                     if (m_correction != corrOff)
@@ -1530,7 +1537,7 @@ void DataProcess::finishMsg(TString fileName, TString operation, ULong64_t event
 ULong64_t DataProcess::roundToNs(ULong64_t number)
 {
 //    return number;
-    return (ULong64_t) ((number * (25.0/4096)) + 0.5);
+    return static_cast<ULong64_t>((number * (25.0/4096)) + 0.5);
 }
 
 void DataProcess::StopLoop()
@@ -1659,7 +1666,9 @@ void DataProcess::appendProcTree(ULong64_t ToATrig[MAXHITS], Double_t ToF[MAXHIT
         m_procTree.push_back(new TTree("proctree", "processed data, Version 0.1.1"));
         m_procTree.back()->Branch("Size", &m_Size, "Size/i");
         m_procTree.back()->Branch("Col",   m_Cols, "Col[Size]/i");
-        m_procTree.back()->Branch("Row",   m_Rows, "Row[Size]/i");
+        m_procTree.back()->Branch("ColCent", &m_posX, "ColCent/D");
+        m_procTree.back()->Branch("Row"    ,  m_Rows, "Row[Size]/i");
+        m_procTree.back()->Branch("RowCent", &m_posY, "RowCent/D");
         m_procTree.back()->Branch("ToT",   m_ToTs, "ToT[Size]/i");
         m_procTree.back()->Branch("ToTt", &m_ToTt, "ToTt/l");    // l for long unsigned
         m_procTree.back()->Branch("ToA",   m_ToAs, "ToA[Size]/l");    // l for long unsigned

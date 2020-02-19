@@ -124,7 +124,7 @@ private:
     //
     // options of GUI
     Bool_t m_bCol;
-    Bool_t m_bRow;
+    Bool_t m_bRow;    
     Bool_t m_bToT;
     Bool_t m_bToA;
     Bool_t m_bTrig;
@@ -219,6 +219,7 @@ private:
     // single pixel data
     UInt_t      m_row;
     UInt_t      m_col;
+    Double_t    m_posX, m_posY;
     UInt_t      m_ToT;
     ULong64_t   m_ToA;
 
