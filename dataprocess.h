@@ -220,6 +220,8 @@ private:
     UInt_t      m_row;
     UInt_t      m_col;
     Double_t    m_posX, m_posY;
+    Double_t    m_stdevX, m_stdevY;
+    ULong64_t   m_stdevToA;
     UInt_t      m_ToT;
     ULong64_t   m_ToA;
 
