@@ -126,6 +126,7 @@ Int_t DataProcess::setOptions(Bool_t bCol,
                               Bool_t bCentroid,
                               Int_t  gapPixel,
                               Float_t gapTime,
+                              Bool_t bForwardTrig,
                               Bool_t bNoTrigWindow,
                               Float_t timeWindow,
                               Float_t timeStart,
@@ -149,6 +150,7 @@ Int_t DataProcess::setOptions(Bool_t bCol,
     m_timeWindow    = static_cast<Double_t>(timeWindow);
     m_timeStart     = static_cast<Double_t>(timeStart );
     m_linesPerFile  = linesPerFile;
+    m_bForwardTrig  = bForwardTrig;
 
     if (timeWindow/1000 > 500)
     {
@@ -1219,8 +1221,12 @@ Int_t DataProcess::processRoot()
     Long64_t currChunkCent = 0;
     Long64_t entryTime = 0;
 
-    ULong64_t lfTimeWindow = static_cast<ULong64_t>(((4096000.0/25.0) * static_cast<Double_t>(m_timeWindow)) + 0.5);
-    ULong64_t lfTimeStart  = static_cast<ULong64_t>(((4096000.0/25.0) * static_cast<Double_t>(m_timeStart )) + 0.5);
+
+    ULong64_t lfTimeWindow_BU = static_cast<ULong64_t>(((4096000.0/25.0) * static_cast<Double_t>(m_timeWindow)) + 0.5);
+    ULong64_t lfTimeStart_BU  = static_cast<ULong64_t>(((4096000.0/25.0) * static_cast<Double_t>(m_timeStart )) + 0.5);
+
+    ULong64_t lfTimeWindow = lfTimeWindow_BU;
+    ULong64_t lfTimeStart  = lfTimeStart_BU ;
 
     Int_t binCount;
     Double_t binMin;
@@ -1321,9 +1327,20 @@ Int_t DataProcess::processRoot()
                     m_trigTimeNext = m_trigTime;
                 }
                 else
-                    m_trigTimeNext = 0;
-                std::cout<< entryTime << " and " << m_nTimes[timeChainCounter] << std::endl;
+                {
+                    m_trigTimeNext = ~static_cast<ULong64_t>(0);
+                }
                 m_timeTree[timeChainCounter]->GetEntry(entryTime - m_nTimes[timeChainCounter]);
+                if (lfTimeStart > (m_trigTimeNext - m_trigTime))
+                    lfTimeStart = 0;
+                else
+                    lfTimeStart = lfTimeStart_BU;
+
+                if ((lfTimeStart + lfTimeWindow) > (m_trigTimeNext - m_trigTime))
+                    lfTimeWindow = m_trigTimeNext - m_trigTime - lfTimeStart;
+                else
+                    lfTimeWindow = lfTimeWindow_BU;
+
             }
 
             if (m_bCsv && m_nCent == 0)
@@ -1356,15 +1373,15 @@ Int_t DataProcess::processRoot()
 
             //
             // dump all useless data
-            if ( m_nTime!= 0 && m_ToAs[0] < (m_trigTime + lfTimeStart))
+            if ( m_nTime!= 0 && ((m_bForwardTrig && (m_ToAs[0] < (m_trigTime + lfTimeStart))) || (!m_bForwardTrig && (m_ToAs[0] < (m_trigTimeNext - lfTimeStart - lfTimeWindow)))))
             {
                 currChunkCent = entryCent;
                 continue;
             }
 
             //
-            // stop rawTree loop if further away then trigger+window
-            if ( m_nTime!= 0 && m_ToAs[0] > (m_trigTime +  lfTimeStart + lfTimeWindow))
+            // stop rawTree loop if further away than trigger+window
+            if ( m_nTime!= 0 && ((m_bForwardTrig && (m_ToAs[0] > (m_trigTime +  lfTimeStart + lfTimeWindow))) || (!m_bForwardTrig && (m_ToAs[0] > (m_trigTimeNext - lfTimeStart)))))
             {
                 currChunkCent = entryCent;
                 break;
@@ -1394,13 +1411,30 @@ Int_t DataProcess::processRoot()
                         //
                         // write centroid data
                         if (m_bTrig)    fprintf(m_filesCentCsv.back(), "%u,",  m_trigCnt);
-                        if (m_bTrigTime)fprintf(m_filesCentCsv.back(), "%llu,",m_trigTime);
+                        if (m_bTrigTime)
+                        {
+                            if (m_bForwardTrig)
+                                fprintf(m_filesCentCsv.back(), "%llu,",m_trigTime);
+                            else
+                                fprintf(m_filesCentCsv.back(), "%llu,",m_trigTimeNext);
+                        }
                         if (m_bCol)     fprintf(m_filesCentCsv.back(), "%u,",  m_Cols[0]);
                         if (m_bRow)     fprintf(m_filesCentCsv.back(), "%u,",  m_Rows[0]);
                         if (m_bToA)     fprintf(m_filesCentCsv.back(), "%llu,",m_ToAs[0]);
                         if (m_bToT)     fprintf(m_filesCentCsv.back(), "%u,",  m_ToTs[0]);
                         if (m_bToT)     fprintf(m_filesCentCsv.back(), "%llu,",m_ToTt);
-                        if (m_bTrigToA) fprintf(m_filesCentCsv.back(), "%llu,",m_ToAs[0] - m_trigTime);
+                        if (m_bTrigToA)
+                        {
+                            if (m_bForwardTrig)
+                            {
+                                fprintf(m_filesCentCsv.back(), "%llu,",m_ToAs[0] - m_trigTime);
+                            }
+                            else
+                            {
+                                fprintf(m_filesCentCsv.back(), "%llu,",m_trigTimeNext - m_ToAs[0]);
+                            }
+                        }
+
                         if (m_bCentroid)fprintf(m_filesCentCsv.back(), "%u,",  m_Size);
                         if (m_bCentroid)fprintf(m_filesCentCsv.back(), "%lf,", m_posX);
                         if (m_bCentroid)fprintf(m_filesCentCsv.back(), "%lf,", m_posY);
@@ -1420,8 +1454,27 @@ Int_t DataProcess::processRoot()
 
                     if (m_bTrigToA)
                     {
-                        ToATrig[0] = m_ToAs[0] - m_trigTime + static_cast<ULong64_t>((4096000.0/25.0) * dCent);
-                        ToF[0] = ((static_cast<Double_t>( m_ToAs[0] - m_trigTime)*25.0)/4096000.0) + dCent;
+                        if (dCent < 0)
+                        {
+                            ToATrig[0] = (m_ToAs[0]) - static_cast<ULong64_t>((std::abs(dCent)) * (4096000.0/25.0));
+                        }
+                        else
+                        {
+                            ToATrig[0] = (m_ToAs[0]) + static_cast<ULong64_t>((dCent) * (4096000.0/25.0));
+                        }
+
+                        if (m_bForwardTrig)
+                        {
+                            ToATrig[0] -= m_trigTime;
+                            ToF[0] = ((static_cast<Double_t>( m_ToAs[0] - m_trigTime ) * 25.0 ) / 4096000.0);
+                        }
+                        else
+                        {
+                            ToATrig[0] = m_trigTimeNext - ToATrig[0];
+                            ToF[0] = ((static_cast<Double_t>( m_trigTimeNext - m_ToAs[0]) * 25.0 ) / 4096000.0);
+                        }
+                        ToF[0] += dCent;
+
                         m_histCentSpectrum->Fill( ToF[0] );
                         m_centToTvsToF->Fill(ToF[0], static_cast<Double_t>(m_ToTs[0])/1000.0 );
 
@@ -1461,13 +1514,25 @@ Int_t DataProcess::processRoot()
                     if (m_bCsv)
                     {
                         if (m_bTrig)    fprintf(m_filesCsv.back(), "%u,",  m_trigCnt);
-                        if (m_bTrigTime)fprintf(m_filesCsv.back(), "%llu,",m_trigTime);
+                        if (m_bTrigTime)
+                        {
+                            if (m_bForwardTrig)
+                                fprintf(m_filesCsv.back(), "%llu,",m_trigTime);
+                            else
+                                fprintf(m_filesCsv.back(), "%llu,",m_trigTimeNext);
+                        }
                         if (m_bCol)     fprintf(m_filesCsv.back(), "%u,",  m_Cols[entryRaw]);
                         if (m_bRow)     fprintf(m_filesCsv.back(), "%u,",  m_Rows[entryRaw]);
                         if (m_bToA)     fprintf(m_filesCsv.back(), "%llu,",m_ToAs[entryRaw]);
                         if (m_bToT)     fprintf(m_filesCsv.back(), "%u,",  m_ToTs[entryRaw]);
                         if (m_bToT)     fprintf(m_filesCsv.back(), "%llu,",m_ToTt);
-                        if (m_bTrigToA) fprintf(m_filesCsv.back(), "%llu,",m_ToAs[entryRaw] - m_trigTime);
+                        if (m_bTrigToA)
+                        {
+                            if (m_bForwardTrig)
+                                fprintf(m_filesCsv.back(), "%llu,",m_ToAs[entryRaw] - m_trigTime);
+                            else
+                                fprintf(m_filesCsv.back(), "%llu,",m_trigTimeNext - m_ToAs[entryRaw]);
+                        }
                     }
 
                     if (m_correction != corrOff)
@@ -1493,12 +1558,24 @@ Int_t DataProcess::processRoot()
                     {
                         if (dToA < 0)
                         {
-                            ToATrig[entryRaw] = (m_ToAs[entryRaw] - m_trigTime) - static_cast<ULong64_t>((std::abs(dToA)) * (4096000.0/25.0));
+                            ToATrig[entryRaw] = (m_ToAs[entryRaw]) - static_cast<ULong64_t>((std::abs(dToA)) * (4096000.0/25.0));
                         }
                         else
-                            ToATrig[entryRaw] = (m_ToAs[entryRaw] - m_trigTime) + static_cast<ULong64_t>((dToA) * (4096000.0/25.0));
+                        {
+                            ToATrig[entryRaw] = (m_ToAs[entryRaw]) + static_cast<ULong64_t>((dToA) * (4096000.0/25.0));
+                        }
 
-                        ToF[entryRaw] = ((static_cast<Double_t>( m_ToAs[entryRaw] - m_trigTime ) * 25.0 ) / 4096000.0);
+                        if (m_bForwardTrig)
+                        {
+                            ToATrig[entryRaw] -= m_trigTime;
+                            ToF[entryRaw] = ((static_cast<Double_t>( m_ToAs[entryRaw] - m_trigTime ) * 25.0 ) / 4096000.0);
+                        }
+                        else
+                        {
+                            ToATrig[entryRaw] = m_trigTimeNext - ToATrig[entryRaw];
+                            ToF[entryRaw] = ((static_cast<Double_t>( m_trigTimeNext - m_ToAs[entryRaw]) * 25.0 ) / 4096000.0);
+                        }
+
                         m_histSpectrum->Fill( ToF[entryRaw] );
                         m_ToTvsToF->Fill(ToF[entryRaw], static_cast<Double_t>(m_ToTs[entryRaw])/1000.0 );
 

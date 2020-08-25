@@ -94,6 +94,7 @@ public:
 
 	bool bSingleFile;
 	bool bNoTrigWindow;
+        bool bForwardTrig;
 
         float timeWindow;
         float timeStart;
@@ -132,6 +133,7 @@ public:
         void SelectCsv(Bool_t);
 	void SelectSingleFile(Bool_t);
 	void SelectNoTrigWindow(Bool_t);
+        void SelectTrigDirection(Bool_t);
         void SelectCent(Bool_t);
 
         void SelectCombined(Bool_t);
@@ -168,6 +170,7 @@ DRGui::DRGui() : TGMainFrame(gClient->GetRoot(), 10, 20, kHorizontalFrame) {
         bProcTree = false;
         bCsv = true;
 	bNoTrigWindow = false;
+        bForwardTrig = true;
         bSingleFile = false;
         bCombineInput = false;
         bCentroid = false;
@@ -284,13 +287,13 @@ DRGui::DRGui() : TGMainFrame(gClient->GetRoot(), 10, 20, kHorizontalFrame) {
         TGCheckButton * trigTime= new TGCheckButton(varsGroup, "Trigger Time");
         TGCheckButton * trigToA = new TGCheckButton(varsGroup, "ToA-Trigger");
 
-	col->SetOn();
-	row->SetOn();
-	toa->SetOn();
-	tot->SetOn();
-        trig->SetOn();
-        trigTime->SetOn();
-        trigToA->SetOn();
+        col->SetOn(bCol);
+        row->SetOn(bRow);
+        toa->SetOn(bToA);
+        tot->SetOn(bToT);
+        trig->SetOn(bTrig);
+        trigTime->SetOn(bTrigTime);
+        trigToA->SetOn(bTrigToA);
 
         varsGroup->AddFrame(col,     new TGLayoutHints(kLHintsExpandX | kLHintsExpandY));
         varsGroup->AddFrame(row,     new TGLayoutHints(kLHintsExpandX | kLHintsExpandY));
@@ -324,8 +327,8 @@ DRGui::DRGui() : TGMainFrame(gClient->GetRoot(), 10, 20, kHorizontalFrame) {
         all ->SetOn();
         data->SetOn(kFALSE);
         root->SetOn(kFALSE);
-        procTree->SetOn(kFALSE);
-        csv->SetOn(kTRUE);
+        procTree->SetOn(bProcTree);
+        csv->SetOn(bCsv);
 
         procGroup->AddFrame(procTree,new TGLayoutHints(kLHintsExpandX | kLHintsExpandY));
 
@@ -350,15 +353,24 @@ DRGui::DRGui() : TGMainFrame(gClient->GetRoot(), 10, 20, kHorizontalFrame) {
         timeW->SetEntry(timeWindow);
         TextMargin * timeS = new TextMargin(cuts, "Time Window Start (micro s)", TGNumberFormat::kNESRealOne);
         timeS->SetEntry(timeStart);
-	TGCheckButton * noTrigWindow = new TGCheckButton(cuts, "All Data");
+        TGHorizontalFrame * trigFrame = new TGHorizontalFrame(cuts);
+        TGCheckButton * noTrigWindow  = new TGCheckButton(trigFrame, "All Data");
+        TGCheckButton * fwdTrigWindow = new TGCheckButton(trigFrame, "Forward Trigger");
+
+        noTrigWindow->SetOn(bNoTrigWindow);
+        fwdTrigWindow->SetOn(bForwardTrig);
 
         cuts->AddFrame(timeS, new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 0, 0, 2, 2));
         cuts->AddFrame(timeW, new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 0, 0, 2, 2));
-        cuts->AddFrame(noTrigWindow, new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 0, 0, 2, 2));
+        trigFrame->AddFrame( noTrigWindow, new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 0, 0, 2, 2));
+        trigFrame->AddFrame(fwdTrigWindow, new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 0, 0, 2, 2));
+        cuts->AddFrame(trigFrame, new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 0, 0, 2, 2));
 
         noTrigWindow->Connect("Toggled(Bool_t)", "TextMargin", timeS, "SetEnabled(Bool_t)");
         noTrigWindow->Connect("Toggled(Bool_t)", "TextMargin", timeW, "SetEnabled(Bool_t)");
 	noTrigWindow->Connect("Toggled(Bool_t)", "DRGui", this, "SelectNoTrigWindow(Bool_t)");
+        fwdTrigWindow->Connect("Toggled(Bool_t)", "DRGui", this, "SelectTrigDirection(Bool_t)");
+
         timeW->GetEntry()->Connect("TextChanged(char*)", "DRGui", this, "ApplyCutsWindow(char*)");
         timeS->GetEntry()->Connect("TextChanged(char*)", "DRGui", this, "ApplyCutsStart(char*)");
 
@@ -467,6 +479,7 @@ void DRGui::SelectCombined(Bool_t check)    { if (check) bCombineInput = check; 
 
 void DRGui::SelectSingleFile(Bool_t check) { bSingleFile = check; }
 void DRGui::SelectNoTrigWindow(Bool_t check) { bNoTrigWindow = check; }
+void DRGui::SelectTrigDirection(Bool_t check) { bForwardTrig = check; }
 
 void DRGui::BrowseCorr()
 {
@@ -545,7 +558,7 @@ void DRGui::RunReducer()
     {
         processor->setName(m_inputNames, inputNumber);
         processor->setProcess(ptProcess);
-        processor->setOptions(bCol, bRow, bToT, bToA, bTrig, bTrigTime, bTrigToA, bProcTree, bCsv, bCentroid, m_gapPix, m_gapTime, bNoTrigWindow, timeWindow, timeStart, bSingleFile, linesPerFile);
+        processor->setOptions(bCol, bRow, bToT, bToA, bTrig, bTrigTime, bTrigToA, bProcTree, bCsv, bCentroid, m_gapPix, m_gapTime, bForwardTrig, bNoTrigWindow, timeWindow, timeStart, bSingleFile, linesPerFile);
         processor->process();
     }
     else
@@ -563,7 +576,7 @@ void DRGui::RunReducer()
             }
 
             processor->setName(tmpString);
-            processor->setOptions(bCol, bRow, bToT, bToA, bTrig, bTrigTime, bTrigToA, bProcTree, bCsv, bCentroid, m_gapPix, m_gapTime, bNoTrigWindow, timeWindow, timeStart, bSingleFile, linesPerFile);
+            processor->setOptions(bCol, bRow, bToT, bToA, bTrig, bTrigTime, bTrigToA, bProcTree, bCsv, bCentroid, m_gapPix, m_gapTime, bForwardTrig, bNoTrigWindow, timeWindow, timeStart, bSingleFile, linesPerFile);
             processor->process();
         }
     }

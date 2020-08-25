@@ -68,6 +68,7 @@ public:
                       Bool_t bCentroid = kFALSE,
                       Int_t gapPixel = 0,
                       Float_t gapTime = 1.0,
+                      Bool_t bForwardTrig = kTRUE,
                       Bool_t bNoTrigWindow = kFALSE,
                       Float_t timeWindow = 40,
                       Float_t timeStart = 0,
@@ -134,6 +135,7 @@ private:
     Bool_t m_bCsv;
     Bool_t m_bCentroid;
     Bool_t m_bNoTrigWindow;
+    Bool_t m_bForwardTrig;
     Bool_t m_bSingleFile;
     Bool_t m_bCorrCsv;
 

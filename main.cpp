@@ -27,6 +27,7 @@ int main(int argc, char **argv)
     int gapPix = 1;
     float gapTime = 1.0;
     bool bNoTrigWindow = true;
+    bool bForwardTrigger = true;
 
     float timeWindow = 0;
     float timeStart = 0;
@@ -40,7 +41,7 @@ int main(int argc, char **argv)
     TString process = "procAll";
     UInt_t maxEntries = 0;
 
-    while( ( c = getopt (argc, argv, ":bcd:f:p:e:") ) != -1 )
+    while( ( c = getopt (argc, argv, ":bctd:f:p:e:") ) != -1 )
     {
         switch(c)
         {
@@ -49,6 +50,9 @@ int main(int argc, char **argv)
                 break;
             case 'c':
                 bCsv = true;
+                break;
+            case 't':
+                bForwardTrigger = false;
                 break;
             case 'd':
                 if (optarg){ dirname = (TString) optarg; combine = true; break;}
@@ -68,6 +72,7 @@ int main(int argc, char **argv)
                 std::cout << "Exiting code. Usage: " << std::endl;
                 std::cout << "-b executes in bash" << std::endl;
                 std::cout << "-c creates csv output" << std::endl;
+                std::cout << "-t backward trigger" << std::endl;
                 std::cout << "-d [] name of folder in which to combine (do not use -f)" << std::endl;
                 std::cout << "-f [] name of file to process (do not use -d)" << std::endl;
                 std::cout << "-p [] procAll/procDat/procRoot" << std::endl;
@@ -88,7 +93,7 @@ int main(int argc, char **argv)
             processor->setProcess(ProcType::procAll);
 
         processor->setNEntries(maxEntries);
-        processor->setOptions(bCol, bRow, bToT, bToA, bTrig, bTrigTime, bTrigToA, bProcTree, bCsv, bCentroid, gapPix, gapTime, bNoTrigWindow, timeWindow, timeStart, bSingleFile);
+        processor->setOptions(bCol, bRow, bToT, bToA, bTrig, bTrigTime, bTrigToA, bProcTree, bCsv, bCentroid, gapPix, gapTime, bForwardTrigger, bNoTrigWindow, timeWindow, timeStart, bSingleFile);
 
         if (combine)
         {

@@ -15,7 +15,7 @@ TARGET = ../Scripts/processing
 
 SOURCES += main.cpp \
     dataprocess.cpp \
-    DRGUI.C
+#    DRGUI.C
 #    mainwindow.cpp
 
 HEADERS += \
