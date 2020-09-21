@@ -36,8 +36,9 @@ enum DataType
     dtDat  = 0,
     dtTpx  = 1,
     dtCent = 2,
+    dtTime = 3,
 
-    dtStandard = 3
+    dtStandard = 4
 };
 
 struct LookupTable
@@ -161,6 +162,7 @@ private:
     TString         m_fileNamePdf;
     TString         m_fileNameCsv;
     TString         m_fileNameCentCsv;
+    TString         m_fileNameTimeCsv;
 
     //
     // files
@@ -169,6 +171,7 @@ private:
     deque<TFile* >  m_filesRoot;
     deque<FILE* >   m_filesCsv;
     deque<FILE* >   m_filesCentCsv;
+    deque<FILE* >   m_filesTimeCsv;
 
     //
     // ROOT trees

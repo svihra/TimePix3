@@ -349,6 +349,7 @@ Int_t DataProcess::processFileNames()
         m_fileNamePdf       = m_fileNameInput[input].Replace(repPos, 200, ".pdf");
         m_fileNameCsv       = m_fileNameInput[input].Replace(repPos, 200, ".csv");
         m_fileNameCentCsv   = m_fileNameInput[input].Replace(repPos, 200, "_cent.csv");
+        m_fileNameTimeCsv   = m_fileNameInput[input].Replace(repPos, 200, "_time.csv");
     }
 
     return 0;
@@ -400,6 +401,9 @@ Int_t DataProcess::openCsv(DataType type, TString fileCounter)
     {
         fileNameTmp = m_fileNameCentCsv;
     }
+    else if (type == dtTime) {
+        fileNameTmp = m_fileNameTimeCsv;
+    }
     else
     {
         fileNameTmp = m_fileNameCsv;
@@ -427,31 +431,44 @@ Int_t DataProcess::openCsv(DataType type, TString fileCounter)
     {
         files = &m_filesCentCsv;
     }
+    else if (type == dtTime)
+    {
+        files = &m_filesTimeCsv;
+    }
     else
     {
         files = &m_filesCsv;
     }
     files->push_back(fileCsv);
 
-    if (m_bTrig)    fprintf(files->back(), "#TrigId,");
-    if (m_bTrigTime)fprintf(files->back(), "#TrigTime,");
-    if (m_bCol)     fprintf(files->back(), "#Col,");
-    if (m_bRow)     fprintf(files->back(), "#Row,");
-    if (m_bToA)     fprintf(files->back(), "#ToA,");
-    if (m_bToT)     fprintf(files->back(), "#ToT[arb],");
-    if (m_bToT)     fprintf(files->back(), "#ToTtotal[arb],");
-    if (m_bTrigToA) fprintf(files->back(), "#Trig-ToA[arb],");
-    if (type == dtCent)
+    if (type == dtTime)
     {
-        if (m_bCentroid)fprintf(files->back(), "#Centroid,");
-        if (m_bCentroid)fprintf(files->back(), "#cent_X,");
-        if (m_bCentroid)fprintf(files->back(), "#cent_Y,");
-        if (m_bCentroid)fprintf(files->back(), "#centStdev_X,");
-        if (m_bCentroid)fprintf(files->back(), "#centStdev_Y,");
-        if (m_bCentroid)fprintf(files->back(), "#centStdev_ToA,");
+        if (m_bTrig)    fprintf(files->back(), "#TrigId,");
+        if (m_bTrigTime)fprintf(files->back(), "#TrigTime,");
+        if (m_bTrigTime)fprintf(files->back(), "#TrigTimeNext,");
+        if (m_bTrig || m_bTrigTime)fprintf(files->back(), "#Events,");
     }
-    if (m_correction != corrOff && m_bTrigToA) fprintf(files->back(), "#cTrig-ToA[us],");
-
+    else
+    {
+        if (m_bTrig)    fprintf(files->back(), "#TrigId,");
+        if (m_bTrigTime)fprintf(files->back(), "#TrigTime,");
+        if (m_bCol)     fprintf(files->back(), "#Col,");
+        if (m_bRow)     fprintf(files->back(), "#Row,");
+        if (m_bToA)     fprintf(files->back(), "#ToA,");
+        if (m_bToT)     fprintf(files->back(), "#ToT[arb],");
+        if (m_bToT)     fprintf(files->back(), "#ToTtotal[arb],");
+        if (m_bTrigToA) fprintf(files->back(), "#Trig-ToA[arb],");
+        if (type == dtCent)
+        {
+            if (m_bCentroid)fprintf(files->back(), "#Centroid,");
+            if (m_bCentroid)fprintf(files->back(), "#cent_X,");
+            if (m_bCentroid)fprintf(files->back(), "#cent_Y,");
+            if (m_bCentroid)fprintf(files->back(), "#centStdev_X,");
+            if (m_bCentroid)fprintf(files->back(), "#centStdev_Y,");
+            if (m_bCentroid)fprintf(files->back(), "#centStdev_ToA,");
+        }
+        if (m_correction != corrOff && m_bTrigToA) fprintf(files->back(), "#cTrig-ToA[us],");
+    }
 
     fprintf(files->back(), "\n");
 
@@ -651,6 +668,12 @@ void DataProcess::closeCsv()
     {
         fclose(m_filesCentCsv.front());
         m_filesCentCsv.pop_front();
+    }
+
+    while (m_filesTimeCsv.size() != 0)
+    {
+        fclose(m_filesTimeCsv.front());
+        m_filesTimeCsv.pop_front();
     }
 }
 
@@ -1218,9 +1241,11 @@ Int_t DataProcess::processRoot()
 {
     Long64_t lineCounter = 0;
     Long64_t lineCounterCent = 0;
+    Long64_t lineCounterTime = 0;
     Long64_t currChunkCent = 0;
     Long64_t entryTime = 0;
 
+    ULong64_t timeWindowEntries = 0;
 
     ULong64_t lfTimeWindow_BU = static_cast<ULong64_t>(((4096000.0/25.0) * static_cast<Double_t>(m_timeWindow)) + 0.5);
     ULong64_t lfTimeStart_BU  = static_cast<ULong64_t>(((4096000.0/25.0) * static_cast<Double_t>(m_timeStart )) + 0.5);
@@ -1343,21 +1368,34 @@ Int_t DataProcess::processRoot()
 
             }
 
-            if (m_bCsv && m_nCent == 0)
+            if (m_bCsv)
             {
                 //
                 // single file creation
-                if (m_filesCsv.size() == 0)
+                if (m_bSingleFile && m_filesTimeCsv.size() == 0)
                 {
-                    std::cout << "opening time csv file" << std::endl;
-                    if (openCsv()) return -1;
+                    std::cout<< "opening time csv file" << std::endl;
+                    if (openCsv(dtTime)) return -1;
                 }
-                //
-                // write trigger data if rawtree is empty
-                if (m_bTrig)    fprintf(m_filesCsv.back(), "%u, ",  m_trigCnt);
-                if (m_bTrigTime)fprintf(m_filesCsv.back(), "%llu, ",m_trigTime);
 
-                fprintf(m_filesCsv.back(), "\n");
+                //
+                // multiple file creation
+                if (!m_bSingleFile && (lineCounterTime % m_linesPerFile == 0))
+                {
+                    if (openCsv(dtTime, TString::Format("%lld", lineCounterTime / m_linesPerFile))) return -1;
+                }
+
+                if (m_bTrig)    fprintf(m_filesTimeCsv.back(), "%u, ",  m_trigCnt);
+                if (m_bForwardTrig)
+                {
+                    if (m_bTrigTime)fprintf(m_filesTimeCsv.back(), "%llu, ",m_trigTime + lfTimeStart);
+                    if (m_bTrigTime)fprintf(m_filesTimeCsv.back(), "%llu, ",m_trigTime + lfTimeStart + lfTimeWindow);
+                }
+                else
+                {
+                    if (m_bTrigTime)fprintf(m_filesTimeCsv.back(), "%llu, ",m_trigTimeNext - lfTimeStart);
+                    if (m_bTrigTime)fprintf(m_filesTimeCsv.back(), "%llu, ",m_trigTimeNext - lfTimeStart - lfTimeWindow);
+                }
             }
         }
 
@@ -1484,6 +1522,7 @@ Int_t DataProcess::processRoot()
                     if (m_bCsv )
                         fprintf(m_filesCentCsv.back(), "\n");
                     lineCounterCent++;
+                    timeWindowEntries++;
                 }
 
                 if (m_bCsv)
@@ -1603,6 +1642,16 @@ Int_t DataProcess::processRoot()
                 }
             }
         }
+
+        //
+        // finish writing the time file, needs to count centroid entries
+        if (m_bCsv)
+        {
+            if (m_bTrigTime || m_bTrig) fprintf(m_filesTimeCsv.back(), "%llu, ",timeWindowEntries);
+            fprintf(m_filesTimeCsv.back(), "\n");
+        }
+        timeWindowEntries = 0;
+        lineCounterTime++;
 
         //
         // stop cycle by incrementing nTime if no trigger entries found
