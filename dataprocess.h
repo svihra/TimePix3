@@ -239,7 +239,7 @@ private:
 
     //
     // trigger data
-    UInt_t      m_trigCnt;
+    ULong64_t   m_trigCnt;
     ULong64_t   m_trigTime;
     ULong64_t   m_trigTimeNext;
 

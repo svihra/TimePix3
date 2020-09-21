@@ -514,8 +514,8 @@ Int_t DataProcess::openRoot(ULong64_t fileCounter)
         m_rawTree.back()->Branch("ToA"    ,   m_ToAs, "ToA[Size]/l");    // l for long
         m_rawTree.back()->Branch("ToAStdev", &m_stdevToA, "ToAStdev/l");
 
-        m_timeTree.push_back(new TTree("timetree", "TDC counts"));
-        m_timeTree.back()->Branch("TrigCntr", &m_trigCnt, "TrigCntr/i");
+        m_timeTree.push_back(new TTree("timetree", "TDC counts, Version 0.1.0"));
+        m_timeTree.back()->Branch("TrigCntr", &m_trigCnt, "TrigCntr/l");
         m_timeTree.back()->Branch("TrigTime", &m_trigTime,"TrigTime/l");
 
         //
@@ -811,6 +811,7 @@ Int_t DataProcess::processDat()
     UInt_t spidr_time;   // additional timestamp added by SPIDR
     UInt_t header;
     UInt_t subheader;
+    UInt_t trigCnt;
     UInt_t trigtime_coarse;
     UInt_t prev_trigtime_coarse = 0 ;
     UInt_t trigtime_fine;
@@ -937,7 +938,7 @@ Int_t DataProcess::processDat()
                 // finding subheader type (F for trigger or 4,5 for time)
                 if ( subheader == 0xF )         // trigger information
                 {
-                    m_trigCnt = ((pixdata & 0x00FFF00000000000) >> 44) & 0xFFF;
+                    trigCnt = ((pixdata & 0x00FFF00000000000) >> 44) & 0xFFF;
                     trigtime_coarse = ((pixdata & 0x00000FFFFFFFF000) >> 12) & 0xFFFFFFFF;
                     tmpfine = (pixdata >> 5 ) & 0xF;   // phases of 320 MHz clock in bits 5 to 8
                     tmpfine = ((tmpfine-1) << 9) / 12;
@@ -945,19 +946,20 @@ Int_t DataProcess::processDat()
 
                     //
                     // check if the first trigger number is 1
-                    if (! m_bFirstTrig && m_trigCnt != 1)
+                    if (! m_bFirstTrig && trigCnt != 1)
                     {
                         std::cout << "first trigger number in file is not 1" << std::endl;
                     } else
                     {
+                        m_trigCnt += 1;
                         if ( trigtime_coarse < prev_trigtime_coarse )   // 32 time counter wrapped
                         {
                             if ( trigtime_coarse < prev_trigtime_coarse-1000 )
                             {
                                 trigtime_global_ext += 0x100000000;
-                                std::cout << "coarse trigger time counter wrapped: " << m_trigCnt << " " << trigtime_coarse << " " << prev_trigtime_coarse << std::endl;
+                                std::cout << "coarse trigger time counter wrapped: " << m_trigCnt << "(" << trigCnt << ") " << trigtime_coarse << " " << prev_trigtime_coarse << std::endl;
                             }
-                            else std::cout << "small backward time jump in trigger packet " << m_trigCnt << " (jump of " << prev_trigtime_coarse-trigtime_coarse << ")" << std::endl;
+                            else std::cout << "small backward time jump in trigger packet " << m_trigCnt << "(" << trigCnt << ") (jump of " << prev_trigtime_coarse-trigtime_coarse << ")" << std::endl;
                         }
                         m_bFirstTrig = kTRUE;
                         m_trigTime = ((trigtime_global_ext + static_cast<ULong64_t>(trigtime_coarse)) << 12) | static_cast<ULong64_t>(trigtime_fine); // save in ns
@@ -1385,7 +1387,7 @@ Int_t DataProcess::processRoot()
                     if (openCsv(dtTime, TString::Format("%lld", lineCounterTime / m_linesPerFile))) return -1;
                 }
 
-                if (m_bTrig)    fprintf(m_filesTimeCsv.back(), "%u, ",  m_trigCnt);
+                if (m_bTrig)    fprintf(m_filesTimeCsv.back(), "%llu, ",  m_trigCnt);
                 if (m_bForwardTrig)
                 {
                     if (m_bTrigTime)fprintf(m_filesTimeCsv.back(), "%llu, ",m_trigTime + lfTimeStart);
@@ -1448,7 +1450,7 @@ Int_t DataProcess::processRoot()
                         }
                         //
                         // write centroid data
-                        if (m_bTrig)    fprintf(m_filesCentCsv.back(), "%u,",  m_trigCnt);
+                        if (m_bTrig)    fprintf(m_filesCentCsv.back(), "%llu,",  m_trigCnt);
                         if (m_bTrigTime)
                         {
                             if (m_bForwardTrig)
@@ -1552,7 +1554,7 @@ Int_t DataProcess::processRoot()
                 {
                     if (m_bCsv)
                     {
-                        if (m_bTrig)    fprintf(m_filesCsv.back(), "%u,",  m_trigCnt);
+                        if (m_bTrig)    fprintf(m_filesCsv.back(), "%llu,",  m_trigCnt);
                         if (m_bTrigTime)
                         {
                             if (m_bForwardTrig)
